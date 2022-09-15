@@ -406,6 +406,47 @@ func resourceHyperVMachineInstance() *schema.Resource {
 				Description: "",
 			},
 
+			"vm_security": {
+				Type:     schema.TypeList,
+				Optional: true,
+				MaxItems: 1,
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"encrypt_state_and_vm_migration_traffic": {
+							Type:        schema.TypeBool,
+							Optional:    true,
+							Default:     false,
+							Description: "Specifies whether the VM will encrypt its state and migration traffic.",
+						},
+						"virtualization_based_security_optout": {
+							Type:        schema.TypeBool,
+							Optional:    true,
+							Default:     false,
+							Description: "Specifies whether the VM will opt out of the virtualization based security.",
+						},
+						"tpm_enabled": {
+							Type:        schema.TypeBool,
+							Optional:    true,
+							Default:     false,
+							Description: "Specifies whether the VM will have a vTPM installed or not.",
+						},
+						"shielded": {
+							Type:        schema.TypeBool,
+							Optional:    true,
+							Default:     false,
+							Description: "Specifies whether the VM will be shielded from other VMs or not.",
+						},
+						"bind_to_host_tpm": {
+							Type:        schema.TypeBool,
+							Optional:    true,
+							Default:     false,
+							Description: "Specifies whether the TPM will be bound to the VM Host server.",
+						},
+					},
+				},
+				Description: "",
+			},
+
 			"network_adaptors": {
 				Type:     schema.TypeList,
 				Optional: true,
@@ -879,6 +920,16 @@ func resourceHyperVMachineInstanceCreate(ctx context.Context, d *schema.Resource
 		if err != nil {
 			return diag.FromErr(err)
 		}
+
+		vmSecurities, err := api.ExpandVmSecurities(d)
+		if err != nil {
+			return diag.FromErr(err)
+		}
+
+		err = client.CreateOrUpdateVmSecurities(ctx, name, vmSecurities)
+		if err != nil {
+			return diag.FromErr(err)
+		}
 	}
 
 	err = client.CreateOrUpdateVmProcessors(ctx, name, vmProcessors)
@@ -955,6 +1006,11 @@ func resourceHyperVMachineInstanceRead(ctx context.Context, d *schema.ResourceDa
 		return diag.FromErr(err)
 	}
 
+	vmSecurities, err := client.GetVmSecurities(ctx, name)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
 	integrationServices, err := client.GetVmIntegrationServices(ctx, name)
 	if err != nil {
 		return diag.FromErr(err)
@@ -1023,6 +1079,13 @@ func resourceHyperVMachineInstanceRead(ctx context.Context, d *schema.ResourceDa
 	}
 	log.Printf("[INFO][hyperv][read] vmProcessors: %v", vmProcessors)
 	log.Printf("[INFO][hyperv][read] flattenedVmProcessors: %v", flattenedVmProcessors)
+
+	flattenedVmSecurities := api.FlattenVmSecurities(&vmSecurities)
+	if err := d.Set("vm_security", flattenedVmSecurities); err != nil {
+		return diag.Errorf("[DEBUG] Error setting vm_security error: %v", err)
+	}
+	log.Printf("[INFO][hyperv][read] vmSecurities: %v", vmSecurities)
+	log.Printf("[INFO][hyperv][read] flattenedVmSecurities: %v", flattenedVmSecurities)
 
 	flattenedIntegrationServices := api.FlattenIntegrationServices(&integrationServices)
 	if err := d.Set("integration_services", flattenedIntegrationServices); err != nil {
@@ -1157,7 +1220,8 @@ func resourceHyperVMachineInstanceUpdate(ctx context.Context, d *schema.Resource
 		d.HasChange("integration_services") ||
 		d.HasChange("network_adaptors") ||
 		d.HasChange("dvd_drives") ||
-		d.HasChange("hard_disk_drives")
+		d.HasChange("hard_disk_drives") ||
+		d.HasChange("vm_security")
 
 	if hasChangesThatRequireVmToBeOff {
 		err := turnOffVmIfOn(ctx, d, client, name)
