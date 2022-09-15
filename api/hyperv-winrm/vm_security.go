@@ -9,7 +9,7 @@ import (
 	"github.com/taliesins/terraform-provider-hyperv/api"
 )
 
-type createorUpdateVmSecurityArgs struct {
+type createOrUpdateVmSecurityArgs struct {
 	VmSecurityJson string
 }
 
@@ -18,6 +18,19 @@ $ErrorActionPreference = 'Stop'
 Import-Module Hyper-V
 $vmSecurity = '{{.VmSecurityJson}}' | ConvertFrom-Json
 
+$currentKeyProtector = Get-VMKeyProtector -VMName $vmSecurity.VmName
+
+if (($vmSecurity.TpmEnabled -or $vmSecurity.Shielded) -and (($null -eq $currentKeyProtector) -or ("AAAABA==" -eq [Convert]::ToBase64String($currentKeyProtector)))) {
+	Set-VMKeyProtector -VMName $vmSecurity.VmName -NewLocalKeyProtector
+}
+
+if ($vmSecurity.TpmEnabled -eq $true) {
+	Enable-VMTPM -VMName $vmSecurity.VmName
+}
+else {
+	Disable-VMTPM -VMName $vmSecurity.VmName
+}
+
 $SetVMSecurityArgs = @{
 	VMName = $vmSecurity.VmName
 	EncryptStateAndVmMigrationTraffic = $vmSecurity.EncryptStateAndVmMigrationTraffic
@@ -25,16 +38,6 @@ $SetVMSecurityArgs = @{
 }
 
 Set-VMSecurity @SetVMSecurityArgs
-
-if ($vmSecurity.TpmEnabled -eq $true) {
-	if ($null -eq (Get-VMKeyProtector -VMName $vmSecurity.VmName)) {
-		Set-VMKeyProtector -VMName $vmSecurity.VmName -NewLocalKeyProtector
-	}
-	Enable-VMTPM -VMName $vmSecurity.VmName
-}
-else {
-	Disable-VMTPM -VMName $vmSecurity.VmName
-}
 
 $SetVMSecurityPolicy = @{
 	VMName = $vmSecurity.VmName
@@ -67,7 +70,7 @@ func (c *ClientConfig) CreateOrUpdateVmSecurity(
 		return err
 	}
 
-	err = c.WinRmClient.RunFireAndForgetScript(ctx, createOrUpdateVmSecurityTemplate, createorUpdateVmSecurityArgs{
+	err = c.WinRmClient.RunFireAndForgetScript(ctx, createOrUpdateVmSecurityTemplate, createOrUpdateVmSecurityArgs{
 		VmSecurityJson: string(vmSecurityJson),
 	})
 

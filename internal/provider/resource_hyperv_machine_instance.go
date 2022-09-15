@@ -1221,7 +1221,7 @@ func resourceHyperVMachineInstanceUpdate(ctx context.Context, d *schema.Resource
 		d.HasChange("network_adaptors") ||
 		d.HasChange("dvd_drives") ||
 		d.HasChange("hard_disk_drives") ||
-		d.HasChange("vm_security")
+		(generation > 1 && d.HasChange("vm_security"))
 
 	if hasChangesThatRequireVmToBeOff {
 		err := turnOffVmIfOn(ctx, d, client, name)
@@ -1302,6 +1302,18 @@ func resourceHyperVMachineInstanceUpdate(ctx context.Context, d *schema.Resource
 		}
 
 		err = client.CreateOrUpdateVmProcessors(ctx, name, vmProcessors)
+		if err != nil {
+			return diag.FromErr(err)
+		}
+	}
+
+	if generation > 1 && d.HasChange("vm_security") {
+		vmSecurities, err := api.ExpandVmSecurities(d)
+		if err != nil {
+			return diag.FromErr(err)
+		}
+
+		err = client.CreateOrUpdateVmSecurities(ctx, name, vmSecurities)
 		if err != nil {
 			return diag.FromErr(err)
 		}

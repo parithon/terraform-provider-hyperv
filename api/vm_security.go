@@ -91,5 +91,5 @@ type HypervVmSecurityClient interface {
 	GetVmSecurity(ctx context.Context, vmName string) (result VmSecurity, err error)
 	GetNoVmSecurities(ctx context.Context) (result []VmSecurity)
 	GetVmSecurities(ctx context.Context, vmName string) (result []VmSecurity, err error)
-	CreateOrUpdateVmSecurities(ctx context.Context, vmName string, vmFirmwares []VmSecurity) (err error)
+	CreateOrUpdateVmSecurities(ctx context.Context, vmName string, VmSecurities []VmSecurity) (err error)
 }
