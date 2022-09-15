@@ -30,7 +30,10 @@ $NewVmNetworkAdapterArgs = @{
 	VmName=$vmNetworkAdapter.VmName
 	Name=$vmNetworkAdapter.Name
 	IsLegacy=$vmNetworkAdapter.IsLegacy
-	SwitchName=$vmNetworkAdapter.SwitchName
+}
+
+if ($vmNetworkAdapter.SwitchName) {
+	$NewVmNetworkAdapterArgs.SwitchName = $vmNetworkAdapter.SwitchName
 }
 
 Add-VmNetworkAdapter @NewVmNetworkAdapterArgs
